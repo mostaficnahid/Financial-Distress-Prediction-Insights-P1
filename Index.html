@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>Interactive Financial Distress Prediction Report</title>
+   <script src="https://cdn.tailwindcss.com"></script>
+   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+   <!-- Visualization & Content Choices:
+       - Report Info: Evolution of prediction models -> Goal: Inform -> Viz/Presentation: HTML/CSS/JS Interactive Timeline -> Interaction: Click milestones -> Justification: Visualizes historical progression better than text.
+       - Report Info: ANN vs PLS-R characteristics -> Goal: Compare -> Viz/Presentation: Conceptual Bar Chart (Chart.js) & Tabbed Text Info -> Interaction: Tabs, Hover on chart bars -> Justification: Direct comparison of features and details.
+       - Report Info: Data Preprocessing Steps (Normalization, Imbalance) -> Goal: Inform/Organize -> Viz/Presentation: Interactive HTML/CSS visual sketches -> Interaction: Click to see visual change/explanation -> Justification: Makes abstract steps more concrete.
+       - Report Info: Performance Metrics -> Goal: Inform/Compare -> Viz/Presentation: Interactive Metric Explanation (HTML/JS) + Conceptual Radar Chart (Chart.js) -> Interaction: Input values for metrics (hypothetical) / Hover on radar -> Justification: Clarifies metric meaning and comparative model performance.
+       - Report Info: Hybrid Model Concept -> Goal: Inform -> Viz/Presentation: HTML/CSS Diagram (PLS-R -> ANN) -> Interaction: None -> Justification: Simple visual explanation of synergy.
+       - CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+   <style>
+       body { font-family: 'Inter', sans-serif; }
+       .nav-link {
+           padding: 0.5rem 1rem;
+           border-radius: 0.375rem;
+           transition: background-color 0.3s ease, color 0.3s ease;
+       }
+       .nav-link.active, .nav-link:hover {
+           background-color: #3B82F6; /* bg-blue-500 */
+           color: white;
+       }
+       .content-section {
+           display: none;
+           padding-top: 1.5rem; /* pt-6 */
+           padding-bottom: 1.5rem; /* pb-6 */
+       }
+       .content-section.active {
+           display: block;
+       }
+       .chart-container {
+           position: relative;
+           width: 100%;
+           max-width: 600px; /* Tailwind max-w-2xl */
+           margin-left: auto;
+           margin-right: auto;
+           height: 320px; /* Tailwind h-80 */
+           max-height: 400px; /* Tailwind max-h-96 */
+       }
+       @media (min-width: 768px) { /* md breakpoint */
+           .chart-container {
+               height: 400px; /* Tailwind h-96 */
+           }
+       }
+       .tab-button {
+           padding: 0.5rem 1rem;
+           border-radius: 0.375rem;
+           background-color: #E5E7EB; /* bg-gray-200 */
+           color: #374151; /* text-gray-700 */
+           transition: background-color 0.3s ease, color 0.3s ease;
+           margin-right: 0.5rem;
+       }
+       .tab-button.active, .tab-button:hover {
+           background-color: #60A5FA; /* bg-blue-400 */
+           color: white;
+       }
+       .tab-content { display: none; }
+       .tab-content.active { display: block; }
+
+
+       .timeline-item {
+           position: relative;
+           padding-bottom: 2rem;
+           padding-left: 2.5rem; /* For icon and line */
+       }
+       .timeline-item:last-child {
+           padding-bottom: 0;
+       }
+       .timeline-item::before { /* Vertical line */
+           content: '';
+           position: absolute;
+           left: 0.625rem; /* Centered with icon */
+           top: 0;
+           bottom: 0;
+           width: 2px;
+           background-color: #D1D5DB; /* gray-300 */
+       }
+       .timeline-item:last-child::before {
+           height: 0.75rem; /* Extend line only to icon height */
+       }
+       .timeline-icon {
+           position: absolute;
+           left: 0;
+           top: 0.125rem;
+           width: 1.5rem;
+           height: 1.5rem;
+           border-radius: 9999px; /* rounded-full */
+           background-color: #3B82F6; /* blue-500 */
+           color: white;
+           display: flex;
+           align-items: center;
+           justify-content: center;
+           font-size: 0.75rem;
+           font-weight: bold;
+       }
+       .interactive-box {
+           border: 1px solid #D1D5DB; /* border-gray-300 */
+           padding: 1rem;
+           border-radius: 0.375rem; /* rounded-md */
+           margin-top: 0.5rem;
+           background-color: #F9FAFB; /* bg-gray-50 */
+       }
+       .stat-card {
+           background-color: white;
+           border-radius: 0.5rem; /* rounded-lg */
+           padding: 1.5rem; /* p-6 */
+           box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1); /* shadow-md */
+           text-align: center;
+       }
+        .modal {
+           position: fixed;
+           top: 0;
+           left: 0;
+           width: 100%;
+           height: 100%;
+           background-color: rgba(0,0,0,0.5);
+           display: flex;
+           justify-content: center;
+           align-items: center;
+           z-index: 1000;
+           opacity: 0;
+           visibility: hidden;
+           transition: opacity 0.3s ease, visibility 0.3s ease;
+       }
+       .modal.active {
+           opacity: 1;
+           visibility: visible;
+       }
+       .modal-content {
+           background-color: white;
+           padding: 2rem;
+           border-radius: 0.5rem;
+           width: 90%;
+           max-width: 500px;
+           box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+       }
+       .loading-indicator {
+           display: none;
+           text-align: center;
+           margin-top: 1rem;
+           color: #3B82F6;
+       }
+       .loading-indicator.active {
+           display: block;
+       }
+   </style>
+</head>
+<body class="bg-stone-100 text-slate-700 antialiased">
+
+
+   <header class="bg-slate-800 text-white shadow-lg sticky top-0 z-50">
+       <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+           <div class="flex items-center justify-between h-16">
+               <h1 class="text-xl sm:text-2xl font-bold">Financial Distress Prediction Insights</h1>
+               <button id="mobileMenuButton" class="md:hidden p-2 rounded-md text-gray-400 hover:text-white hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white">
+                   <span class="sr-only">Open main menu</span>
+                   <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                   </svg>
+               </button>
+           </div>
+           <nav id="mainNav" class="hidden md:flex flex-col md:flex-row md:items-center md:justify-center space-y-2 md:space-y-0 md:space-x-2 py-2">
+               <a href="#overview" class="nav-link active">Overview</a>
+               <a href="#understanding" class="nav-link">Understanding Distress</a>
+               <a href="#techniques" class="nav-link">Core Techniques</a>
+               <a href="#building" class="nav-link">Model Building & Evaluation</a>
+               <a href="#comparative" class="nav-link">Comparative Insights</a>
+               <a href="#future" class="nav-link">Challenges & Future</a>
+           </nav>
+       </div>
+   </header>
+
+
+   <main class="container mx-auto p-4 sm:p-6 lg:p-8">
+       <section id="overview" class="content-section active">
+           <h2 class="text-2xl sm:text-3xl font-semibold text-sky-700 mb-4">Welcome to the Interactive Report</h2>
+           <p class="mb-4 text-lg leading-relaxed">
+               This interactive application synthesizes key findings from the research report "Advanced Predictive Modeling for Financial Distress: An Analysis of Artificial Neural Networks and Partial Least Squares Regression." It aims to provide an accessible overview of how advanced quantitative techniques like Artificial Neural Networks (ANN) and Partial Least Squares Regression (PLS-R) are revolutionizing the prediction of financial distress.
+           </p>
+           <p class="mb-4 leading-relaxed">
+               Financial distress prediction is vital for managers, investors, and regulators to take timely actions. While traditional models laid the groundwork, ANN and PLS-R offer enhanced capabilities to handle complex, non-linear relationships and high-dimensional financial data. This report explores their theoretical underpinnings, implementations, and comparative performance.
+           </p>
+           <div class="grid md:grid-cols-2 gap-6 mt-6">
+               <div class="bg-white p-6 rounded-lg shadow-lg border-l-4 border-sky-500">
+                   <h3 class="text-xl font-semibold text-sky-600 mb-2">Artificial Neural Networks (ANN)</h3>
+                   <p>ANNs excel at identifying complex, non-linear patterns in data, making them powerful for prediction tasks where traditional linear models may fall short.</p>
+               </div>
+               <div class="bg-white p-6 rounded-lg shadow-lg border-l-4 border-amber-500">
+                   <h3 class="text-xl font-semibold text-amber-600 mb-2">Partial Least Squares Regression (PLS-R)</h3>
+                   <p>PLS-R is adept at handling datasets with many correlated variables (multicollinearity) and when predictors outnumber observations, common in financial analysis.</p>
+               </div>
+           </div>
+           <p class="mt-6 text-sm text-slate-600">
+               Navigate through the sections using the menu above to delve deeper into specific aspects of financial distress prediction models.
+           </p>
+       </section>
+
+
+       <section id="understanding" class="content-section">
+           <h2 class="text-2xl sm:text-3xl font-semibold text-sky-700 mb-4">Understanding Financial Distress</h2>
+           <p class="mb-6 text-lg leading-relaxed">
+               This section defines financial distress, outlines its significance, and traces the evolution of predictive modeling. Understanding these fundamentals is crucial before exploring advanced techniques like ANN and PLS-R.
+           </p>
+          
+           <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+               <h3 class="text-xl font-semibold text-sky-600 mb-2">Definition and Significance</h3>
+               <p class="mb-2">Financial distress occurs when a company cannot meet its financial obligations. Early detection is crucial as it allows stakeholders (managers, investors, creditors) to implement remedial measures, evaluate risks, and avoid severe consequences like bankruptcy. Effective prediction models act as early warning systems, enabling proactive rather than reactive financial risk management.</p>
+           </div>
+
+
+           <h3 class="text-xl font-semibold text-sky-600 mb-4">Evolution of Prediction Models</h3>
+           <div class="relative">
+               <div id="timelineContainer" class="space-y-8">
+                   </div>
+           </div>
+            <p class="mt-6 text-sm text-slate-600">
+               The evolution highlights a shift from models with restrictive statistical assumptions to more flexible, data-driven machine learning approaches capable of handling the complexity of real-world financial data.
+           </p>
+       </section>
+
+
+       <section id="techniques" class="content-section">
+           <h2 class="text-2xl sm:text-3xl font-semibold text-sky-700 mb-4">Core Techniques: ANN vs. PLS-R</h2>
+           <p class="mb-6 text-lg leading-relaxed">
+               This section provides a detailed comparison of Artificial Neural Networks (ANN) and Partial Least Squares Regression (PLS-R), the two primary advanced modeling techniques discussed in the report. Explore their principles, strengths, weaknesses, and data requirements to understand their distinct roles and potential synergies in financial distress prediction.
+           </p>
+           <div class="mb-4">
+               <button class="tab-button active" data-tab="annTab">Artificial Neural Networks (ANN)</button>
+               <button class="tab-button" data-tab="plsTab">Partial Least Squares Regression (PLS-R)</button>
+               <button class="tab-button" data-tab="annPlsComparisonChartTab">Feature Comparison Chart</button>
+           </div>
+
+
+           <div id="annTab" class="tab-content active bg-white p-6 rounded-lg shadow-md">
+               <h3 class="text-xl font-semibold text-sky-600 mb-3">Artificial Neural Networks (ANN)</h3>
+               <p class="mb-2">Inspired by the human brain, ANNs are non-parametric models adept at learning complex, non-linear patterns from data. They consist of interconnected layers of nodes (input, hidden, output).</p>
+               <strong class="block mt-3 mb-1">Key Characteristics:</strong>
+               <ul class="list-disc list-inside ml-4 space-y-1">
+                   <li>Handles non-linear relationships effectively.</li>
+                   <li>Can model highly complex data and large quantities of it.</li>
+                   <li>Common architecture: Multi-Layer Perceptron (MLP) trained with backpropagation.</li>
+                   <li>Activation functions (e.g., ReLU, Sigmoid) introduce non-linearity.</li>
+               </ul>
+               <strong class="block mt-3 mb-1">Strengths:</strong>
+               <ul class="list-disc list-inside ml-4 space-y-1">
+                   <li>Often achieve higher predictive accuracy than traditional models.</li>
+                   <li>Flexible and adaptable to various data types.</li>
+               </ul>
+               <strong class="block mt-3 mb-1">Weaknesses:</strong>
+               <ul class="list-disc list-inside ml-4 space-y-1">
+                   <li>Can be "black boxes," lacking interpretability.</li>
+                   <li>Prone to overfitting if not carefully designed and trained.</li>
+                   <li>May struggle with very high-dimensional data (curse of dimensionality).</li>
+                   <li>Computationally intensive for large networks.</li>
+               </ul>
+               <strong class="block mt-3 mb-1">Data Requirements:</strong> Primarily financial ratios, but rigorous preprocessing (normalization, handling imbalance, feature selection) is crucial.
+           </div>
+
+
+           <div id="plsTab" class="tab-content bg-white p-6 rounded-lg shadow-md">
+               <h3 class="text-xl font-semibold text-amber-600 mb-3">Partial Least Squares Regression (PLS-R)</h3>
+               <p class="mb-2">PLS-R is a statistical method effective for analyzing datasets with highly correlated predictors (multicollinearity) or when predictors outnumber observations.</p>
+                <strong class="block mt-3 mb-1">Key Characteristics:</strong>
+               <ul class="list-disc list-inside ml-4 space-y-1">
+                   <li>Reduces dimensionality by creating latent variables (components).</li>
+                   <li>Maximizes covariance between predictors and the response variable.</li>
+                   <li>Robust against multicollinearity and overfitting in high-dimensional settings.</li>
+               </ul>
+               <strong class="block mt-3 mb-1">Strengths:</strong>
+               <ul class="list-disc list-inside ml-4 space-y-1">
+                   <li>Handles multicollinearity and high-dimensional data effectively.</li>
+                   <li>More interpretable than ANNs through variable importance measures (e.g., VIP scores).</li>
+                   <li>Can perform well with small sample sizes relative to predictors.</li>
+               </ul>
+               <strong class="block mt-3 mb-1">Weaknesses:</strong>
+               <ul class="list-disc list-inside ml-4 space-y-1">
+                   <li>Primarily a linear method, may not capture complex non-linearities as well as ANNs.</li>
+                   <li>Performance can depend on the selection of the number of latent components.</li>
+               </ul>
+               <strong class="block mt-3 mb-1">Data Requirements:</strong> Financial ratios are common inputs. Preprocessing like normalization is important. Handles intercorrelated ratios well.
+           </div>
+
+
+           <div id="annPlsComparisonChartTab" class="tab-content bg-white p-6 rounded-lg shadow-md">
+                <h3 class="text-xl font-semibold text-purple-600 mb-3">ANN vs. PLS-R: Feature Comparison</h3>
+                <p class="mb-4">This chart provides a conceptual comparison of ANN and PLS-R across several key modeling features. Scores are illustrative (1=Low, 5=High) based on general tendencies discussed in the report.</p>
+               <div class="chart-container">
+                   <canvas id="annPlsComparisonChart"></canvas>
+               </div>
+           </div>
+       </section>
+
+
+       <section id="building" class="content-section">
+           <h2 class="text-2xl sm:text-3xl font-semibold text-sky-700 mb-4">Model Building & Evaluation</h2>
+           <p class="mb-6 text-lg leading-relaxed">
+               Effective financial distress prediction relies on careful model construction and rigorous evaluation. This section outlines the typical data used, critical preprocessing steps, implementation highlights for ANN and PLS-R, and the key metrics for assessing model performance.
+           </p>
+
+
+           <div class="grid md:grid-cols-2 gap-6 mb-8">
+               <div class="bg-white p-6 rounded-lg shadow-md">
+                   <h3 class="text-xl font-semibold text-sky-600 mb-3">Data Collection & Variables</h3>
+                   <p class="mb-2">Models primarily use financial ratios from statements (balance sheets, income, cash flow):</p>
+                   <ul class="list-disc list-inside ml-4 space-y-1 mb-2">
+                       <li><strong>Liquidity:</strong> Current Ratio, Working Capital/Total Assets</li>
+                       <li><strong>Leverage/Solvency:</strong> Debt/Equity, MVE/Book Value of Liabilities</li>
+                       <li><strong>Profitability:</strong> EBIT/Total Assets, Retained Earnings/Total Assets</li>
+                       <li><strong>Activity/Efficiency:</strong> Sales/Total Assets</li>
+                   </ul>
+                   <p>Broader models may also include macroeconomic factors, corporate governance data, and non-financial indicators.</p>
+
+
+                   <div class="mt-6 p-4 border border-blue-200 rounded-md bg-blue-50">
+                       <h4 class="font-semibold text-blue-700 mb-2">✨ Financial Ratio Explainer</h4>
+                       <p class="text-sm mb-3">Enter a financial ratio name (e.g., "Current Ratio", "Debt-to-Equity") to get a quick explanation of its meaning in financial analysis.</p>
+                       <input type="text" id="ratioInput" placeholder="Enter ratio name..." class="w-full p-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2">
+                       <button id="explainRatioButton" class="w-full bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition duration-200 ease-in-out">Explain Ratio ✨</button>
+                       <div id="ratioExplanationOutput" class="mt-3 text-sm text-slate-700 p-2 bg-blue-100 rounded-md hidden"></div>
+                       <div id="ratioLoadingIndicator" class="loading-indicator">Generating explanation...</div>
+                   </div>
+               </div>
+               <div class="bg-white p-6 rounded-lg shadow-md">
+                   <h3 class="text-xl font-semibold text-sky-600 mb-3">Data Preprocessing</h3>
+                   <p class="mb-2">Crucial steps to ensure data quality and suitability:</p>
+                   <ul class="list-disc list-inside ml-4 space-y-1">
+                       <li class="cursor-pointer hover:text-blue-500" onclick="showModal('modalNormalization')">Data Cleaning & Normalization/Standardization</li>
+                       <li class="cursor-pointer hover:text-blue-500" onclick="showModal('modalImbalance')">Handling Imbalanced Datasets (e.g., SMOTE)</li>
+                       <li class="cursor-pointer hover:text-blue-500" onclick="showModal('modalDimensionality')">Feature Selection/Extraction (Dimensionality Reduction)</li>
+                   </ul>
+               </div>
+           </div>
+          
+           <div class="bg-white p-6 rounded-lg shadow-md mb-8">
+               <h3 class="text-xl font-semibold text-sky-600 mb-3">Performance Evaluation Metrics</h3>
+               <p class="mb-4">Beyond simple accuracy, various metrics are used, especially for imbalanced datasets:</p>
+               <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                   <div class="stat-card">
+                       <h4 class="font-semibold text-lg">Accuracy</h4>
+                       <p class="text-sm text-slate-600">(TP+TN)/(TP+TN+FP+FN)</p>
+                       <p class="text-xs mt-1">Overall correctness. Can be misleading in imbalanced sets.</p>
+                   </div>
+                   <div class="stat-card">
+                       <h4 class="font-semibold text-lg">Precision</h4>
+                       <p class="text-sm text-slate-600">TP/(TP+FP)</p>
+                       <p class="text-xs mt-1">Of those predicted positive, how many are true positives.</p>
+                   </div>
+                   <div class="stat-card">
+                       <h4 class="font-semibold text-lg">Recall (Sensitivity)</h4>
+                       <p class="text-sm text-slate-600">TP/(TP+FN)</p>
+                       <p class="text-xs mt-1">Of actual positives, how many were identified.</p>
+                   </div>
+                   <div class="stat-card">
+                       <h4 class="font-semibold text-lg">F1-score</h4>
+                       <p class="text-sm text-slate-600">2*(Precision*Recall)/(Precision+Recall)</p>
+                       <p class="text-xs mt-1">Harmonic mean of Precision and Recall.</p>
+                   </div>
+                   <div class="stat-card">
+                       <h4 class="font-semibold text-lg">AUC-ROC</h4>
+                        <p class="text-sm text-slate-600">Area Under ROC Curve</p>
+                       <p class="text-xs mt-1">Model's ability to discriminate between classes.</p>
+                   </div>
+                    <div class="stat-card">
+                       <h4 class="font-semibold text-lg">Type I & II Errors</h4>
+                       <p class="text-sm text-slate-600">FP & FN</p>
+                       <p class="text-xs mt-1">Type I: False Alarm. Type II: Missed Detection (often more costly).</p>
+                   </div>
+               </div>
+                <p class="mb-4">This radar chart conceptually illustrates how different model types might perform across key metrics. Values are illustrative and not from a specific study in the report.</p>
+               <div class="chart-container">
+                   <canvas id="modelPerformanceRadarChart"></canvas>
+               </div>
+           </div>
+       </section>
+
+
+       <section id="comparative" class="content-section">
+           <h2 class="text-2xl sm:text-3xl font-semibold text-sky-700 mb-4">Comparative Insights & Hybrid Models</h2>
+           <p class="mb-6 text-lg leading-relaxed">
+               This section delves into empirical comparisons between ANN, PLS-R, and other models. It also explores the rationale and benefits of hybrid models, particularly those combining the strengths of PLS-R for data preprocessing and ANN for non-linear pattern recognition.
+           </p>
+
+
+           <div class="grid md:grid-cols-2 gap-6 mb-8">
+               <div class="bg-white p-6 rounded-lg shadow-md">
+                   <h3 class="text-xl font-semibold text-sky-600 mb-3">Empirical Comparisons</h3>
+                   <p class="mb-2">Numerous studies compare model performances. Key takeaways:</p>
+                   <ul class="list-disc list-inside ml-4 space-y-1">
+                       <li>Machine learning models (like ANNs) generally outperform traditional statistical methods in accuracy. Accuracies for ANNs can be very high (e.g., 95-98% in some studies).</li>
+                       <li>PLS-R is effective with multicollinearity and high-dimensional data.</li>
+                       <li>No single model is universally superior; performance is context-dependent (dataset, prediction horizon). For example, one study found SVM best one year prior, but a hybrid SVM-PLS model was best two years prior.</li>
+                   </ul>
+               </div>
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                   <h3 class="text-xl font-semibold text-amber-600 mb-3">Hybrid Models: The Synergy</h3>
+                   <p class="mb-2">Hybrid models combine techniques to leverage complementary strengths:</p>
+                   <ul class="list-disc list-inside ml-4 space-y-1 mb-3">
+                       <li><strong>Rationale:</strong> ANNs capture non-linearity but struggle with high dimensions/multicollinearity. PLS-R excels at dimensionality reduction and handling multicollinearity.</li>
+                       <li><strong>Common Architecture:</strong> PLS-R preprocesses data (extracts latent variables) which then feed into an ANN.</li>
+                       <li><strong>Benefits:</strong> Simplified ANN input, mitigated multicollinearity, potentially improved training efficiency, accuracy, and robustness.</li>
+                   </ul>
+                    <p class="text-center font-medium">Conceptual Hybrid Model Flow (PLS-R + ANN):</p>
+                   <div class="mt-2 p-4 border border-dashed border-amber-400 rounded-md bg-amber-50 flex flex-col sm:flex-row items-center justify-center space-y-2 sm:space-y-0 sm:space-x-4">
+                       <div class="bg-slate-200 p-3 rounded text-center">Financial Ratios<br>(High-Dim, Correlated)</div>
+                       <div class="text-2xl text-amber-600">&rarr;</div>
+                       <div class="bg-amber-200 p-3 rounded text-center">PLS-R<br>(Latent Variables)</div>
+                       <div class="text-2xl text-amber-600">&rarr;</div>
+                       <div class="bg-sky-200 p-3 rounded text-center">ANN<br>(Non-linear Model)</div>
+                       <div class="text-2xl text-amber-600">&rarr;</div>
+                       <div class="bg-green-200 p-3 rounded text-center">Distress Prediction</div>
+                   </div>
+               </div>
+           </div>
+            <p class="text-sm text-slate-600">
+               The trend towards hybrid models reflects a pragmatic approach to maximize predictive power by thoughtfully integrating the best features of different methodologies.
+           </p>
+       </section>
+
+
+       <section id="future" class="content-section">
+           <h2 class="text-2xl sm:text-3xl font-semibold text-sky-700 mb-4">Challenges, Ethics & Future Directions</h2>
+           <p class="mb-6 text-lg leading-relaxed">
+               Despite advancements, financial distress prediction faces ongoing challenges and ethical considerations. This section summarizes these issues and looks towards promising future research avenues that aim to create more robust, transparent, and adaptable predictive systems.
+           </p>
+           <div class="grid md:grid-cols-3 gap-6">
+               <div class="bg-white p-6 rounded-lg shadow-md">
+                   <h3 class="text-xl font-semibold text-red-600 mb-3">Current Challenges & Limitations</h3>
+                   <ul class="list-disc list-inside ml-4 space-y-2 text-sm">
+                       <li><strong>Interpretability:</strong> ANNs often act as "black boxes."</li>
+                       <li><strong>Data Imbalance:</strong> Distressed firms are rare, biasing models.</li>
+                       <li><strong>Data Quality & Availability:</strong> Inconsistencies, missing data.</li>
+                       <li><strong>Adaptability:</strong> Models struggle with economic shocks (concept drift).</li>
+                       <li><strong>Computational Complexity:</strong> Training large models can be intensive.</li>
+                   </ul>
+               </div>
+               <div class="bg-white p-6 rounded-lg shadow-md">
+                   <h3 class="text-xl font-semibold text-yellow-600 mb-3">Ethical Considerations</h3>
+                   <ul class="list-disc list-inside ml-4 space-y-2 text-sm">
+                       <li><strong>Bias:</strong> Models may perpetuate historical biases in data.</li>
+                       <li><strong>Transparency & Accountability:</strong> Lack of clarity can erode trust.</li>
+                       <li><strong>Data Privacy & Security:</strong> Handling sensitive financial data.</li>
+                       <li><strong>Ethical Investment:</strong> Aligning AI with ESG criteria.</li>
+                   </ul>
+               </div>
+               <div class="bg-white p-6 rounded-lg shadow-md">
+                   <h3 class="text-xl font-semibold text-green-600 mb-3">Future Research Avenues</h3>
+                   <ul class="list-disc list-inside ml-4 space-y-2 text-sm" id="futureResearchList">
+                       <li>
+                           <span><strong>Explainable AI (XAI):</strong> Enhance model interpretability.</span>
+                           <button class="ml-2 bg-green-500 text-white px-2 py-1 rounded-md text-xs hover:bg-green-600 transition duration-200 ease-in-out generate-research-idea" data-topic="Explainable AI (XAI) in financial distress prediction">Expand Idea ✨</button>
+                       </li>
+                       <li>
+                           <span><strong>Dynamic Modeling:</strong> Adapt to concept drift and economic changes.</span>
+                           <button class="ml-2 bg-green-500 text-white px-2 py-1 rounded-md text-xs hover:bg-green-600 transition duration-200 ease-in-out generate-research-idea" data-topic="Dynamic modeling for financial distress prediction">Expand Idea ✨</button>
+                       </li>
+                       <li>
+                           <span><strong>Diverse Data Sources:</strong> Incorporate textual data, social media sentiment.</span>
+                           <button class="ml-2 bg-green-500 text-white px-2 py-1 rounded-md text-xs hover:bg-green-600 transition duration-200 ease-in-out generate-research-idea" data-topic="Incorporating diverse data sources for financial distress prediction">Expand Idea ✨</button>
+                       </li>
+                       <li>
+                           <span><strong>Advanced Ensembles/Hybrids:</strong> Further explore sophisticated combinations.</span>
+                           <button class="ml-2 bg-green-500 text-white px-2 py-1 rounded-md text-xs hover:bg-green-600 transition duration-200 ease-in-out generate-research-idea" data-topic="Advanced ensemble and hybrid models for financial distress prediction">Expand Idea ✨</button>
+                       </li>
+                       <li>
+                           <span><strong>Addressing Imbalance:</strong> Develop better techniques for rare event prediction.</span>
+                           <button class="ml-2 bg-green-500 text-white px-2 py-1 rounded-md text-xs hover:bg-green-600 transition duration-200 ease-in-out generate-research-idea" data-topic="Techniques for addressing data imbalance in financial distress prediction">Expand Idea ✨</button>
+                       </li>
+                       <li>
+                           <span><strong>Longer Prediction Horizons:</strong> Extend reliable predictions beyond 1-2 years.</span>
+                           <button class="ml-2 bg-green-500 text-white px-2 py-1 rounded-md text-xs hover:bg-green-600 transition duration-200 ease-in-out generate-research-idea" data-topic="Extending prediction horizons in financial distress modeling">Expand Idea ✨</button>
+                       </li>
+                   </ul>
+                   <div id="researchIdeaOutput" class="mt-4 text-sm text-slate-700 p-2 bg-green-100 rounded-md hidden"></div>
+                   <div id="researchIdeaLoadingIndicator" class="loading-indicator">Generating ideas...</div>
+               </div>
+           </div>
+            <p class="mt-8 text-center text-slate-600">
+               Addressing these areas will be key to advancing financial distress prediction, ultimately supporting greater economic stability.
+           </p>
+       </section>
+   </main>
+
+
+   <div id="modalNormalization" class="modal">
+       <div class="modal-content">
+           <h3 class="text-xl font-semibold text-sky-600 mb-3">Data Cleaning & Normalization</h3>
+           <p class="mb-2"><strong>Data Cleaning:</strong> Involves handling missing values (e.g., by removing records, or imputing values based on means, medians, or more complex models) and identifying/addressing outliers (extreme values that can disproportionately affect model training).</p>
+           <p class="mb-2"><strong>Normalization/Standardization:</strong> Financial ratios often have different scales and units. Normalization (e.g., scaling to a 0-1 range) or standardization (e.g., transforming to zero mean and unit variance) ensures all features contribute more equally to the model's learning process. This prevents features with larger absolute values from dominating those with smaller values, regardless of their actual importance.</p>
+           <button onclick="closeModal('modalNormalization')" class="mt-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Close</button>
+       </div>
+   </div>
+   <div id="modalImbalance" class="modal">
+       <div class="modal-content">
+           <h3 class="text-xl font-semibold text-sky-600 mb-3">Handling Imbalanced Datasets</h3>
+           <p class="mb-2">In financial distress prediction, healthy firms typically vastly outnumber distressed firms. This "class imbalance" can bias models towards predicting the majority (healthy) class, leading to poor performance in identifying the crucial minority (distressed) class.</p>
+           <p class="mb-2"><strong>Techniques include:</strong></p>
+           <ul class="list-disc list-inside ml-4 space-y-1">
+               <li><strong>Oversampling:</strong> Increasing the number of minority class samples. SMOTE (Synthetic Minority Over-sampling Technique) is popular; it creates synthetic samples rather than just duplicating existing ones.</li>
+               <li><strong>Undersampling:</strong> Reducing the number of majority class samples.</li>
+               <li><strong>Cost-sensitive learning:</strong> Assigning a higher misclassification cost to errors on the minority class.</li>
+           </ul>
+           <button onclick="closeModal('modalImbalance')" class="mt-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Close</button>
+       </div>
+   </div>
+   <div id="modalDimensionality" class="modal">
+       <div class="modal-content">
+           <h3 class="text-xl font-semibold text-sky-600 mb-3">Feature Selection & Extraction</h3>
+           <p class="mb-2">Financial datasets can have many variables (high dimensionality). The "curse of dimensionality" refers to problems that arise with too many features: increased computational cost, higher risk of overfitting, and potentially reduced model accuracy as irrelevant or redundant features add noise.</p>
+           <p class="mb-2"><strong>Methods to address this:</strong></p>
+           <ul class="list-disc list-inside ml-4 space-y-1">
+               <li><strong>Feature Selection:</strong> Choosing a subset of the most relevant original features (e.g., using statistical tests, information gain, or model-based importance like Random Forest).</li>
+               <li><strong>Feature Extraction:</strong> Creating new, fewer features (latent variables) from the original ones. PLS-R and PCA (Principal Component Analysis) are common. PLS-R is particularly suited as it creates components that are predictive of the outcome.</li>
+           </ul>
+           <button onclick="closeModal('modalDimensionality')" class="mt-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Close</button>
+       </div>
+   </div>
+
+
+   <footer class="bg-slate-800 text-white text-center p-6 mt-12">
+       <p>&copy; <span id="currentYear"></span> Interactive Report on Financial Distress Prediction. Based on cited research.</p>
+   </footer>
+
+
+   <script>
+       document.addEventListener('DOMContentLoaded', function () {
+           const navLinks = document.querySelectorAll('.nav-link');
+           const contentSections = document.querySelectorAll('.content-section');
+           const mobileMenuButton = document.getElementById('mobileMenuButton');
+           const mainNav = document.getElementById('mainNav');
+           const tabButtons = document.querySelectorAll('.tab-button');
+           const tabContents = document.querySelectorAll('.tab-content');
+
+
+           document.getElementById('currentYear').textContent = new Date().getFullYear();
+
+
+           // Navigation
+           function updateActiveNav(hash) {
+               navLinks.forEach(link => {
+                   if (link.getAttribute('href') === hash) {
+                       link.classList.add('active');
+                   } else {
+                       link.classList.remove('active');
+                   }
+               });
+               contentSections.forEach(section => {
+                   if ('#' + section.id === hash) {
+                       section.classList.add('active');
+                   } else {
+                       section.classList.remove('active');
+                   }
+               });
+           }
+          
+           navLinks.forEach(link => {
+               link.addEventListener('click', function (e) {
+                   e.preventDefault();
+                   const targetId = this.getAttribute('href');
+                   window.location.hash = targetId;
+                   if (mainNav.classList.contains('flex') && window.innerWidth < 768) { // md breakpoint
+                       mainNav.classList.add('hidden');
+                       mainNav.classList.remove('flex');
+                   }
+               });
+           });
+
+
+           window.addEventListener('hashchange', () => {
+               const hash = window.location.hash || '#overview';
+                updateActiveNav(hash);
+           });
+          
+           // Initial load
+           const initialHash = window.location.hash || '#overview';
+           updateActiveNav(initialHash);
+
+
+
+
+           // Mobile menu
+           mobileMenuButton.addEventListener('click', () => {
+               mainNav.classList.toggle('hidden');
+               mainNav.classList.toggle('flex');
+           });
+          
+           // Tabs for Core Techniques
+           tabButtons.forEach(button => {
+               button.addEventListener('click', function() {
+                   tabButtons.forEach(btn => btn.classList.remove('active'));
+                   this.classList.add('active');
+                  
+                   const targetTab = this.dataset.tab;
+                   tabContents.forEach(content => {
+                       if (content.id === targetTab) {
+                           content.classList.add('active');
+                       } else {
+                           content.classList.remove('active');
+                       }
+                   });
+               });
+           });
+
+
+           // Timeline Data for "Understanding Distress"
+           const timelineData = [
+               { year: "1960s", event: "Early academic work begins, focusing on bond default/bankruptcy using financial ratios.", milestone: "Origins" },
+               { year: "1968", event: "Altman's Z-score model introduces multivariate discriminant analysis, combining 5 key financial ratios.", milestone: "Z-Score" },
+               { year: "1980", event: "Ohlson introduces logistic regression, establishing a conditional probability model for distress.", milestone: "Logit" },
+               { year: "1980s+", event: "Further models (Taffler, Zmijewski) explore accrual and cash ratios. Limitations of traditional models (linearity, normality assumptions) become apparent.", milestone: "Expansion" },
+               { year: "Late 1990s / 2000s+", event: "Rise of Machine Learning: ANNs and other ML techniques gain traction due to better handling of non-linearities and complex data without strict statistical assumptions.", milestone: "ML Era" }
+           ];
+
+
+           const timelineContainer = document.getElementById('timelineContainer');
+           timelineData.forEach((item, index) => {
+               const div = document.createElement('div');
+               div.className = 'timeline-item';
+               div.innerHTML = `
+                   <div class="timeline-icon">${index + 1}</div>
+                   <h4 class="font-semibold text-lg mb-1">${item.milestone} (${item.year})</h4>
+                   <p class="text-sm text-slate-600">${item.event}</p>
+               `;
+               timelineContainer.appendChild(div);
+           });
+
+
+           // Chart.js: ANN vs PLS-R Comparison
+           const annPlsCtx = document.getElementById('annPlsComparisonChart').getContext('2d');
+           if (window.annPlsChart instanceof Chart) {
+               window.annPlsChart.destroy();
+           }
+           window.annPlsChart = new Chart(annPlsCtx, {
+               type: 'bar',
+               data: {
+                   labels: ['Handles Non-linearity', 'Handles Multicollinearity', 'Interpretability', 'Data Dimensionality Handling', 'Computational Cost (High Dim)'],
+                   datasets: [
+                       {
+                           label: 'ANN (Conceptual Score 1-5)',
+                           data: [5, 2, 2, 3, 4], // Higher is better for first 4, higher is worse for last
+                           backgroundColor: 'rgba(59, 130, 246, 0.6)', // sky-500
+                           borderColor: 'rgba(59, 130, 246, 1)',
+                           borderWidth: 1
+                       },
+                       {
+                           label: 'PLS-R (Conceptual Score 1-5)',
+                           data: [2, 5, 4, 5, 2],
+                           backgroundColor: 'rgba(245, 158, 11, 0.6)', // amber-500
+                           borderColor: 'rgba(245, 158, 11, 1)',
+                           borderWidth: 1
+                       }
+                   ]
+               },
+               options: {
+                   responsive: true,
+                   maintainAspectRatio: false,
+                   scales: {
+                       y: {
+                           beginAtZero: true,
+                           max: 5,
+                           title: { display: true, text: 'Conceptual Score (1=Low, 5=High)'}
+                       }
+                   },
+                   plugins: {
+                       tooltip: {
+                           callbacks: {
+                               label: function(context) {
+                                   let label = context.dataset.label || '';
+                                   if (label) {
+                                       label += ': ';
+                                   }
+                                   if (context.parsed.y !== null) {
+                                       label += context.parsed.y;
+                                       if(context.label === 'Computational Cost (High Dim)') {
+                                           label += (context.parsed.y > 3 ? ' (Higher Cost)' : ' (Lower Cost)');
+                                       } else {
+                                           label += (context.parsed.y > 3 ? ' (Strong)' : ' (Weaker)');
+                                       }
+                                   }
+                                   return label;
+                               }
+                           }
+                       },
+                       legend: { position: 'top' }
+                   }
+               }
+           });
+          
+           // Chart.js: Model Performance Radar Chart
+           const radarCtx = document.getElementById('modelPerformanceRadarChart').getContext('2d');
+           if (window.modelPerformanceRadarChart instanceof Chart) {
+               window.modelPerformanceRadarChart.destroy();
+           }
+           window.modelPerformanceRadarChart = new Chart(radarCtx, {
+               type: 'radar',
+               data: {
+                   labels: ['Accuracy', 'Precision', 'Recall', 'F1-Score', 'AUC-ROC', 'Low Type II Error'],
+                   datasets: [
+                       {
+                           label: 'Ideal ANN (Conceptual)',
+                           data: [0.9, 0.85, 0.9, 0.87, 0.92, 0.9], // High recall means low Type II error
+                           fill: true,
+                           backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                           borderColor: 'rgb(59, 130, 246)',
+                           pointBackgroundColor: 'rgb(59, 130, 246)',
+                           pointBorderColor: '#fff',
+                           pointHoverBackgroundColor: '#fff',
+                           pointHoverBorderColor: 'rgb(59, 130, 246)'
+                       },
+                       {
+                           label: 'Traditional Model (Conceptual)',
+                           data: [0.75, 0.7, 0.65, 0.67, 0.75, 0.65],
+                           fill: true,
+                           backgroundColor: 'rgba(245, 158, 11, 0.2)',
+                           borderColor: 'rgb(245, 158, 11)',
+                           pointBackgroundColor: 'rgb(245, 158, 11)',
+                           pointBorderColor: '#fff',
+                           pointHoverBackgroundColor: '#fff',
+                           pointHoverBorderColor: 'rgb(245, 158, 11)'
+                       }
+                   ]
+               },
+               options: {
+                   responsive: true,
+                   maintainAspectRatio: false,
+                   elements: {
+                       line: { borderWidth: 3 }
+                   },
+                   scales: {
+                       r: {
+                           angleLines: { display: true },
+                           suggestedMin: 0,
+                           suggestedMax: 1,
+                           pointLabels: { font: { size: 10 } } // Smaller font for labels if needed
+                       }
+                   },
+                   plugins: {
+                       legend: { position: 'top' },
+                       tooltip: {
+                           callbacks: {
+                               label: function(context) {
+                                   let label = context.dataset.label || '';
+                                   if (label) {
+                                       label += ': ';
+                                   }
+                                   if (context.parsed.r !== null) {
+                                       label += Math.round(context.parsed.r * 100) / 100;
+                                   }
+                                   return label;
+                               }
+                           }
+                       }
+                   }
+               }
+           });
+
+
+           // Gemini API Integration: Financial Ratio Explainer ✨
+           const ratioInput = document.getElementById('ratioInput');
+           const explainRatioButton = document.getElementById('explainRatioButton');
+           const ratioExplanationOutput = document.getElementById('ratioExplanationOutput');
+           const ratioLoadingIndicator = document.getElementById('ratioLoadingIndicator');
+
+
+           explainRatioButton.addEventListener('click', async () => {
+               const ratioName = ratioInput.value.trim();
+               if (!ratioName) {
+                   ratioExplanationOutput.textContent = 'Please enter a financial ratio name.';
+                   ratioExplanationOutput.classList.remove('hidden');
+                   return;
+               }
+
+
+               ratioExplanationOutput.classList.add('hidden');
+               ratioLoadingIndicator.classList.add('active');
+
+
+               try {
+                   let chatHistory = [];
+                   const prompt = `Explain the financial ratio "${ratioName}" in the context of financial health and distress prediction. Include its typical calculation and what its values imply. Keep the explanation concise and easy to understand for a general audience.`;
+                   chatHistory.push({ role: "user", parts: [{ text: prompt }] });
+                   const payload = { contents: chatHistory };
+                   const apiKey = "";
+                   const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+                  
+                   const response = await fetch(apiUrl, {
+                       method: 'POST',
+                       headers: { 'Content-Type': 'application/json' },
+                       body: JSON.stringify(payload)
+                   });
+                   const result = await response.json();
+
+
+                   if (result.candidates && result.candidates.length > 0 &&
+                       result.candidates[0].content && result.candidates[0].content.parts &&
+                       result.candidates[0].content.parts.length > 0) {
+                       const text = result.candidates[0].content.parts[0].text;
+                       ratioExplanationOutput.textContent = text;
+                       ratioExplanationOutput.classList.remove('hidden');
+                   } else {
+                       ratioExplanationOutput.textContent = 'Could not generate an explanation. Please try again.';
+                       ratioExplanationOutput.classList.remove('hidden');
+                   }
+               } catch (error) {
+                   console.error('Error calling Gemini API:', error);
+                   ratioExplanationOutput.textContent = 'An error occurred while fetching the explanation. Please try again later.';
+                   ratioExplanationOutput.classList.remove('hidden');
+               } finally {
+                   ratioLoadingIndicator.classList.remove('active');
+               }
+           });
+
+
+           // Gemini API Integration: Future Research Idea Expander ✨
+           const generateResearchIdeaButtons = document.querySelectorAll('.generate-research-idea');
+           const researchIdeaOutput = document.getElementById('researchIdeaOutput');
+           const researchIdeaLoadingIndicator = document.getElementById('researchIdeaLoadingIndicator');
+
+
+           generateResearchIdeaButtons.forEach(button => {
+               button.addEventListener('click', async () => {
+                   const topic = button.dataset.topic;
+                   researchIdeaOutput.classList.add('hidden');
+                   researchIdeaLoadingIndicator.classList.add('active');
+
+
+                   try {
+                       let chatHistory = [];
+                       const prompt = `Elaborate on the future research avenue: "${topic}". Suggest specific research questions or approaches within this area related to financial distress prediction. Provide a concise paragraph.`;
+                       chatHistory.push({ role: "user", parts: [{ text: prompt }] });
+                       const payload = { contents: chatHistory };
+                       const apiKey = "";
+                       const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+                      
+                       const response = await fetch(apiUrl, {
+                           method: 'POST',
+                           headers: { 'Content-Type': 'application/json' },
+                           body: JSON.stringify(payload)
+                       });
+                       const result = await response.json();
+
+
+                       if (result.candidates && result.candidates.length > 0 &&
+                           result.candidates[0].content && result.candidates[0].content.parts &&
+                           result.candidates[0].content.parts.length > 0) {
+                           const text = result.candidates[0].content.parts[0].text;
+                           researchIdeaOutput.textContent = text;
+                           researchIdeaOutput.classList.remove('hidden');
+                       } else {
+                           researchIdeaOutput.textContent = 'Could not generate research ideas. Please try again.';
+                           researchIdeaOutput.classList.remove('hidden');
+                       }
+                   } catch (error) {
+                       console.error('Error calling Gemini API:', error);
+                       researchIdeaOutput.textContent = 'An error occurred while fetching research ideas. Please try again later.';
+                       researchIdeaOutput.classList.remove('hidden');
+                   } finally {
+                       researchIdeaLoadingIndicator.classList.remove('active');
+                   }
+               });
+           });
+       });
+
+
+       // Modal functions
+       function showModal(modalId) {
+           document.getElementById(modalId).classList.add('active');
+       }
+
+
+       function closeModal(modalId) {
+           document.getElementById(modalId).classList.remove('active');
+       }
+      
+       // Close modal on escape key
+       document.addEventListener('keydown', function(event) {
+           if (event.key === "Escape") {
+               document.querySelectorAll('.modal.active').forEach(modal => modal.classList.remove('active'));
+           }
+       });
+       // Close modal on clicking outside content
+       document.querySelectorAll('.modal').forEach(modal => {
+           modal.addEventListener('click', function(event) {
+               if (event.target === this) { // Check if click is on modal backdrop
+                   this.classList.remove('active');
+               }
+           });
+       });
+
+
+   </script>
+</body>
+</html>
+
+
+
